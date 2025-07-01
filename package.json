@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "homepage": "https://wenpeng-ai.github.io/vue-echarts-excel",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
