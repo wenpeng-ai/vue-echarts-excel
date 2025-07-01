@@ -9,7 +9,6 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/vue-echarts-excel/',
   plugins: [
     vue(),
     vueDevTools(),
