@@ -2,6 +2,8 @@
 
 基于Vue3 + ECharts的Excel数据可视化分析工具，可以自动将Excel表格数据转换为箱线图（盒须图）和散点图进行统计分析。
 
+[在线预览](https://wenpeng-ai.github.io/vue-echarts-excel/)
+
 ## 功能特性
 
 - 📊 **Excel文件解析**: 支持.xlsx和.xls格式文件
@@ -45,7 +47,7 @@ yarn
 ### 开发环境运行
 
 ```bash
-yarn start
+yarn dev
 ```
 
 ### 生产环境构建
