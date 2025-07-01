@@ -174,17 +174,13 @@ function setupChartClickListener() {
 function setupChartZRenderListener(echartsInstance: any, chartId: string) {
   // 监听整个图表区域的点击事件（包括空白区域）
   echartsInstance.getZr().on('click', (event: any) => {
-    console.log('ZRender click event:', event, 'chartId:', chartId)
-    
     // 如果正在处理图表点击事件，忽略这个事件
     if (isHandlingChartClick.value) {
-      console.log('Chart click is being handled, ignoring ZRender event')
       return
     }
     
     // 检查是否点击的是散点图的数据点
     if (event.target && event.target.dataIndex !== undefined) {
-      console.log('Clicked on data point via ZRender, ignoring (will be handled by chart click)')
       return // 如果是数据点，让 ECharts 的点击事件处理
     }
     
@@ -192,12 +188,10 @@ function setupChartZRenderListener(echartsInstance: any, chartId: string) {
     setTimeout(() => {
       // 再次检查是否正在处理图表点击
       if (isHandlingChartClick.value) {
-        console.log('Chart click started during delay, ignoring ZRender blank area click')
         return
       }
       
       // 只清除全局选中状态
-      console.log('Clicked on blank area via ZRender, clearing selection for chart:', chartId)
       selectedPoint.value = null
       updateChartSelection()
     }, 10) // 10ms延迟，给ECharts点击事件优先处理
@@ -223,7 +217,6 @@ watch(
   () => props.preciseUpdateData,
   (newPreciseData: PreciseUpdateData | null | undefined) => {
     if (newPreciseData && newPreciseData.cellChange) {
-      console.log('Received precise update data:', newPreciseData);
       handlePreciseUpdate(newPreciseData)
     }
   },
@@ -232,20 +225,12 @@ watch(
 
 // 处理精准更新
 function handlePreciseUpdate(preciseData: PreciseUpdateData) {
-  console.log('🎯 ChartDisplay - Handling precise update:', preciseData)
-  
   if (!preciseData.cellChange || !props.columnMapping) {
-    console.log('🚫 Missing cell change data or column mapping, skipping precise update')
     return
   }
 
-  console.log('🔍 Precise update - Row:', preciseData.cellChange.rowIndex, 'Column:', preciseData.cellChange.columnIndex)
-  console.log('🔍 Old column name:', preciseData.cellChange.oldColumnName)
-  console.log('🔍 New value:', preciseData.cellChange.newValue)
-
   // 检查是否应该使用精准更新
   if (!shouldUsePreciseUpdate(preciseData.cellChange, props.chartOptions)) {
-    console.log('❌ Conditions not met for precise update, will use normal chart update flow')
     return
   }
 
@@ -259,7 +244,6 @@ function handlePreciseUpdate(preciseData: PreciseUpdateData) {
   const echartsInstance = chartInstance.chart || chartInstance
 
   if (echartsInstance) {
-    console.log('🔧 Calling updateChartPrecisely...')
     const success = updateChartPrecisely(
       echartsInstance,
       preciseData,
@@ -267,12 +251,6 @@ function handlePreciseUpdate(preciseData: PreciseUpdateData) {
       props.chartOptions,
       preciseData.cellChange.oldColumnName // 传递旧列名
     )
-
-    if (!success) {
-      console.log('❌ Precise update failed, chart will be updated through normal flow')
-    } else {
-      console.log('✅ Precise update successful!')
-    }
   }
 }
 
@@ -286,8 +264,6 @@ function handleChartLeave() {
 
 // 处理散点图点击选中
 function handleChartClick(params: any, chartId: string) {
-  console.log('Chart clicked:', params, 'chartId:', chartId)
-  
   // 立即设置标志，表示正在处理图表点击事件
   isHandlingChartClick.value = true
   
@@ -299,7 +275,6 @@ function handleChartClick(params: any, chartId: string) {
   
   // 如果没有 params，说明点击的是空白区域，清空全局选中状态
   if (!params) {
-    console.log('Clicked on empty area (no params), clearing selection')
     selectedPoint.value = null
     updateChartSelection()
     resetFlag()
@@ -308,7 +283,6 @@ function handleChartClick(params: any, chartId: string) {
   
   // 如果 params 存在但没有 componentType，说明点击的是空白区域
   if (!params.componentType) {
-    console.log('Clicked on empty area (no componentType), clearing selection')
     selectedPoint.value = null
     updateChartSelection()
     resetFlag()
@@ -317,7 +291,6 @@ function handleChartClick(params: any, chartId: string) {
   
   // 如果点击的不是系列组件，清空选中状态
   if (params.componentType !== 'series') {
-    console.log('Clicked on non-series component, clearing selection')
     selectedPoint.value = null
     updateChartSelection()
     resetFlag()
@@ -326,7 +299,6 @@ function handleChartClick(params: any, chartId: string) {
   
   // 如果点击的不是散点图或者没有数据，清空选中状态
   if (!params.seriesType || params.seriesType !== 'scatter' || !params.data) {
-    console.log('Clicked on non-scatter element or no data, clearing selection')
     selectedPoint.value = null
     updateChartSelection()
     resetFlag()
@@ -341,17 +313,13 @@ function handleChartClick(params: any, chartId: string) {
     value: params.data.value || params.value
   }
   
-  console.log('Clicked on scatter point:', clickedPoint)
-  
   // 如果点击的是已选中的点，则取消选中
   if (selectedPoint.value && 
       selectedPoint.value.chartId === clickedPoint.chartId &&
       selectedPoint.value.seriesIndex === clickedPoint.seriesIndex &&
       selectedPoint.value.dataIndex === clickedPoint.dataIndex) {
-    console.log('Clicking same point, deselecting')
     selectedPoint.value = null
   } else {
-    console.log('Selecting new point')
     selectedPoint.value = clickedPoint
   }
   
@@ -405,8 +373,6 @@ function handleChartClick(params: any, chartId: string) {
       }
     }
     
-    console.log('Emitting chart point selected:', { dataIndex, originalRowIndex, columnName, seriesName });
-    
     emit('chartPointSelected', {
       dataRowIndex: originalRowIndex, // 使用原始行索引
       columnName: columnName,
@@ -423,10 +389,7 @@ function handleChartClick(params: any, chartId: string) {
 }
 
 // 高亮指定的图表点（表格选中单元格时调用）
-function highlightChartPoint(originalRowIndex: number, columnName: string) {
-  console.log('Highlighting chart point:', { originalRowIndex, columnName });
-  console.log('Chart options:', props.chartOptions);
-  
+function highlightChartPoint(originalRowIndex: number, columnName: string) {  
   // 设置标志，防止全局点击事件干扰
   isHandlingTableSelection.value = true;
   
@@ -442,12 +405,10 @@ function highlightChartPoint(originalRowIndex: number, columnName: string) {
   
   if (isGroupedCharts.value) {
     // 分组图表情况
-    console.log('Processing grouped charts');
     Object.keys(props.chartOptions).forEach(chartId => {
       const chartOption = props.chartOptions[chartId];
       if (chartOption && chartOption.series) {
         chartOption.series.forEach((series: any, seriesIndex: number) => {
-          console.log('Checking series:', series.name, 'against column:', columnName);
           const seriesColumnName = series.name.replace('散点', '').trim();
           // 增强匹配逻辑：检查完全匹配或包含关系
           if (seriesColumnName === columnName || series.name.includes(columnName) || columnName.includes(seriesColumnName)) {
@@ -460,17 +421,14 @@ function highlightChartPoint(originalRowIndex: number, columnName: string) {
                 dataPoint.originalRowIndex === originalRowIndex
               );
             }
-            console.log('Found matching series:', series.name, 'at index:', seriesIndex, 'chartDataIndex:', chartDataIndex);
           }
         });
       }
     });
   } else {
     // 单个图表情况
-    console.log('Processing single chart');
     if (props.chartOptions.series) {
       props.chartOptions.series.forEach((series: any, seriesIndex: number) => {
-        console.log('Checking series:', series.name, 'against column:', columnName);
         const seriesColumnName = series.name.replace('散点', '').trim();
         // 增强匹配逻辑：检查完全匹配或包含关系
         if (seriesColumnName === columnName || series.name.includes(columnName) || columnName.includes(seriesColumnName)) {
@@ -482,14 +440,12 @@ function highlightChartPoint(originalRowIndex: number, columnName: string) {
               dataPoint.originalRowIndex === originalRowIndex
             );
           }
-          console.log('Found matching series:', series.name, 'at index:', seriesIndex, 'chartDataIndex:', chartDataIndex);
         }
       });
     }
   }
   
   if (targetSeriesIndex === -1 || chartDataIndex === -1) {
-    console.log('Series or data point not found for column:', columnName, 'originalRowIndex:', originalRowIndex);
     isHandlingTableSelection.value = false;
     return;
   }
@@ -514,8 +470,6 @@ function highlightChartPoint(originalRowIndex: number, columnName: string) {
     }
   }
   
-  console.log('Found actual value:', actualValue);
-  
   // 设置选中点
   selectedPoint.value = {
     chartId: targetChartId,
@@ -535,7 +489,6 @@ function highlightChartPoint(originalRowIndex: number, columnName: string) {
 
 // 清除图表高亮
 function clearChartHighlight() {
-  console.log('Clearing chart highlight');
   selectedPoint.value = null;
   updateChartSelection();
 }
@@ -549,8 +502,6 @@ defineExpose({
 
 // 更新图表的选中状态和虚线交叉
 function updateChartSelection() {
-  console.log('updateChartSelection called, selectedPoint:', selectedPoint.value)
-  
   // 清除所有图表的十字线
   const allChartIds = isGroupedCharts.value ? Object.keys(groupedChartRefs.value) : ['single']
   
@@ -582,7 +533,6 @@ function updateChartSelection() {
   
   // 如果没有选中的点，清除全局缓存并返回
   if (!selectedPoint.value) {
-    console.log('No selected point, cleared all graphics')
     currentCrosshairPosition.value = null
     return
   }
@@ -595,7 +545,6 @@ function updateChartSelection() {
   const echartsInstance = chartInstance.chart || chartInstance
   if (!echartsInstance) return
   
-  console.log('Drawing crosshairs for selected point on chart:', targetChartId)
   const [xValue, yValue] = selectedPoint.value.value
   
   // 立即更新十字线位置
@@ -638,7 +587,6 @@ function updateChartSelection() {
     
     // 如果是第一次显示或者没有缓存位置，直接显示
     if (!currentCrosshairPosition.value) {
-      console.log('First time showing crosshair, no animation')
       currentCrosshairPosition.value = newPosition
       drawCrosshair(echartsInstance, newPosition, gridAreaLeft, gridAreaRight, gridAreaTop, gridAreaBottom)
       return
@@ -647,12 +595,10 @@ function updateChartSelection() {
     // 如果位置相同，不需要动画
     if (currentCrosshairPosition.value.pixelX === pixelX && 
         currentCrosshairPosition.value.pixelY === pixelY) {
-      console.log('Same position, no animation needed')
       return
     }
     
     // 执行平滑动画
-    console.log('Animating crosshair movement')
     animateCrosshair(
       echartsInstance, 
       currentCrosshairPosition.value, 
@@ -807,7 +753,6 @@ watch(() => props.chartOptions, () => {
 function handleKeyDown(event: KeyboardEvent) {
   // 按 Escape 键取消选中
   if (event.key === 'Escape' && selectedPoint.value) {
-    console.log('Escape key pressed, clearing selection')
     selectedPoint.value = null
     updateChartSelection()
   }
@@ -817,7 +762,6 @@ function handleKeyDown(event: KeyboardEvent) {
 function handleGlobalClick(event: Event) {
   // 如果正在处理表格选中操作，忽略全局点击事件
   if (isHandlingTableSelection.value) {
-    console.log('Ignoring global click during table selection')
     return
   }
   
@@ -831,7 +775,6 @@ function handleGlobalClick(event: Event) {
   // 检查点击的元素是否在表格组件内（避免表格操作清除图表选中状态）
   const excelEditorElement = document.querySelector('.excel-editor')
   if (excelEditorElement && excelEditorElement.contains(event.target as Node)) {
-    console.log('Clicked in table area, ignoring for chart selection')
     return
   }
   
@@ -841,14 +784,12 @@ function handleGlobalClick(event: Event) {
   }
   
   // 如果点击的是图表外和表格外的任何地方，清除选中状态
-  console.log('Clicked outside chart and table area, clearing selection')
   selectedPoint.value = null
   updateChartSelection()
 }
 
 // 组件挂载后设置图表实例和键盘监听
 onMounted(() => {
-  console.log('ChartDisplay mounted, chart precision update ready')
   // 添加键盘事件监听
   document.addEventListener('keydown', handleKeyDown)
   

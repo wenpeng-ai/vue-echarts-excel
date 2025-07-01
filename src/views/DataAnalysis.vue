@@ -130,8 +130,6 @@ function handleChartLeave() {
 
 // 处理单元格选中事件（表格 -> 图表）
 function handleCellSelected(cellInfo: any) {
-  console.log("Cell selected in table:", cellInfo);
-  
   if (!cellInfo) {
     // 清除图表高亮
     if (chartDisplayRef.value && chartDisplayRef.value.clearChartHighlight) {
@@ -148,8 +146,6 @@ function handleCellSelected(cellInfo: any) {
 
 // 处理图表点击事件（图表 -> 表格）
 function handleChartPointSelected(pointInfo: any) {
-  console.log("Chart point selected:", pointInfo);
-  
   if (!pointInfo) {
     // 清除表格高亮
     if (excelEditorRef.value && excelEditorRef.value.clearCellHighlight) {
@@ -166,13 +162,11 @@ function handleChartPointSelected(pointInfo: any) {
 
 // 处理精准单元格变更
 function handleCellChange(data: PreciseUpdateData) {
-  console.log('Received cell change:', data);
   
   // 检查是否为真正的结构性变化（新增列等，但不包括表头修改）
   const isStructuralChange = !columnMapping.value[data.cellChange.columnIndex];
   
   if (isStructuralChange) {
-    console.log('Structural change detected (new column), performing full update');
     // 对于结构性变化，处理常规数据变更
     if (data.fullData) {
       handleDataChange(data.fullData);
@@ -182,12 +176,10 @@ function handleCellChange(data: PreciseUpdateData) {
   
   // 对于表头修改，只更新列映射，不重新生成图表
   if (data.cellChange.rowIndex === 0 && data.fullData && data.fullData.columnMapping) {
-    console.log('Header change detected, updating column mapping only');
     columnMapping.value = data.fullData.columnMapping;
   }
   
   // 尝试精准更新
-  console.log('Attempting precise update for:', data.cellChange.rowIndex === 0 ? 'header change' : 'data change');
   preciseUpdateData.value = data;
   
   // 清除精准更新数据（防止重复触发）

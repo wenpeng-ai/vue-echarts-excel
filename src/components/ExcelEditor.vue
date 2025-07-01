@@ -14,6 +14,24 @@
           </el-icon>上传Excel
         </el-button>
       </el-upload>
+      
+      <!-- Sheet选择器 -->
+      <div v-if="availableSheets.length > 1" class="sheet-selector">
+        <el-select 
+          v-model="currentSheetName" 
+          placeholder="选择工作表"
+          size="small"
+          @change="handleSheetChange"
+        >
+          <el-option
+            v-for="sheetName in availableSheets"
+            :key="sheetName"
+            :label="sheetName"
+            :value="sheetName"
+          />
+        </el-select>
+      </div>
+      
       <el-button size="small" @click="loadSampleData">
         <el-icon>
           <Star />
@@ -72,6 +90,11 @@ const spreadsheetRef = ref<HTMLElement>();
 const spreadsheet = ref<any>(null);
 const currentHeaderRows = ref<string[][]>([]);
 
+// 工作表相关数据
+const availableSheets = ref<string[]>([]);
+const currentSheetName = ref<string>('');
+const currentWorkbook = ref<any>(null);
+
 // 添加选中状态管理
 const selectedCellPosition = ref<{ row: number; col: number } | null>(null);
 const highlightedCells = ref<Set<string>>(new Set()); // 存储高亮单元格的位置字符串
@@ -115,18 +138,24 @@ function clearCellSelection() {
 let columnMapping: { [originalIndex: number]: string } = {};
 
 // 将Excel数据加载到x-data-spreadsheet中
-async function loadExcelDataToSpreadsheet(workbook: any) {
+async function loadExcelDataToSpreadsheet(workbook: any, sheetName?: string) {
   if (!spreadsheet.value || !workbook) {
     return;
   }
 
   try {
-    // 获取第一个工作表的名称
-    const firstSheetName = workbook.SheetNames[0];
+    // 如果没有指定工作表名称，使用第一个工作表
+    const targetSheetName = sheetName || workbook.SheetNames[0];
+    
+    // 确保工作表存在
+    if (!workbook.SheetNames.includes(targetSheetName)) {
+      throw new Error(`工作表 "${targetSheetName}" 不存在`);
+    }
 
     // 使用原始数据保持显示格式
     const rawData = loadRawWorkbookData(workbook);
-    const firstSheet = rawData[0];
+    const targetSheetIndex = workbook.SheetNames.indexOf(targetSheetName);
+    const targetSheet = rawData[targetSheetIndex];
 
     // 同时获取处理后的列名映射
     const {
@@ -134,9 +163,7 @@ async function loadExcelDataToSpreadsheet(workbook: any) {
       headerRows,
       columnGroups,
       headerRowCount
-    } = loadSheetData(workbook, firstSheetName);
-
-    console.log("headerRows", headerRows);
+    } = loadSheetData(workbook, targetSheetName);
 
     // 存储表头行数据供后续使用
     currentHeaderRows.value = headerRows || [];
@@ -147,19 +174,11 @@ async function loadExcelDataToSpreadsheet(workbook: any) {
       columnMapping[index] = col;
     });
 
-    console.log("Column mapping:", columnMapping);
-    console.log("Raw sheet data:", firstSheet);
-    console.log("Processed columns:", processedColumns);
-
     // 简单直接的表头级数判断
     const isMultiLevel = headerRows && headerRows.length > 1;
-    console.log("表头级数判断:", {
-      headerRowsLength: headerRows ? headerRows.length : 0,
-      isMultiLevel: isMultiLevel
-    });
 
     // 加载原始数据到表格（保持原始显示格式）
-    spreadsheet.value.loadData([firstSheet]);
+    spreadsheet.value.loadData([targetSheet]);
 
     // 使用通用函数取消选中
     clearCellSelection();
@@ -184,6 +203,7 @@ function initSpreadsheet() {
     const options: any = {
       mode: "edit" as const,
       showToolbar: false,
+      showBottomBar: false,
       showGrid: true,
       showContextmenu: true,
       view: {
@@ -222,16 +242,12 @@ function initSpreadsheet() {
 
     // 添加事件监听器，监听单元格编辑
     s.on("cell-edited", (text: string, ri: number, ci: number) => {
-      console.log("Cell edited:", { text, ri, ci });
-      
       let oldColumnName: string | undefined;
       
       // 如果编辑的是表头行（第0行），更新列映射
       if (ri === 0) {
-        console.log("Header cell edited, updating column mapping");
         oldColumnName = columnMapping[ci]; // 保存旧的列名
         columnMapping[ci] = text || `Column${ci}`;
-        console.log(`Column mapping updated: ${oldColumnName} -> ${columnMapping[ci]}`);
       }
       
       // 精准更新：发送具体的单元格变更信息
@@ -252,7 +268,6 @@ function initSpreadsheet() {
 
     // 添加单元格选中事件监听器 - 实现双向高亮联动
     s.on("cell-selected", (cell: any, ri: number, ci: number) => {
-      console.log("Cell selected:", { cell, ri, ci });
       
       // 跳过表头行（第0行是表头）
       if (ri <= 0) {
@@ -281,12 +296,6 @@ function initSpreadsheet() {
         cellPosition: { row: ri, col: ci },
         cellValue: cell?.text || ""
       });
-    });
-
-    // 监听多个单元格选中（可选功能）
-    s.on("cells-selected", (cell: any, range: { sri: number, sci: number, eri: number, eci: number }) => {
-      console.log("Cells selected:", { cell, range });
-      // 可以在这里处理多选情况
     });
 
     // 初始化空数据
@@ -325,14 +334,6 @@ function highlightCell(originalRowIndex: number, columnName: string) {
   const actualRowIndex = originalRowIndex;
   const actualColumnIndex = parseInt(columnIndex);
   
-  console.log("Highlighting cell:", { 
-    originalRowIndex, 
-    actualRowIndex, 
-    columnName,
-    actualColumnIndex, 
-    columnMapping 
-  });
-  
   try {
     // 获取表格实例
     const s = spreadsheet.value;
@@ -347,7 +348,6 @@ function highlightCell(originalRowIndex: number, columnName: string) {
     // 设置选中的单元格
     if (s.sheet.selector) {
       s.sheet.selector.set(actualRowIndex, actualColumnIndex, actualRowIndex, actualColumnIndex);
-      console.log("Cell selector set to:", { row: actualRowIndex, col: actualColumnIndex });
     } else {
       console.warn("Sheet selector not available");
     }
@@ -363,9 +363,6 @@ function highlightCell(originalRowIndex: number, columnName: string) {
     // 添加到高亮集合
     const cellKey = `${actualRowIndex}-${actualColumnIndex}`;
     highlightedCells.value.add(cellKey);
-    
-    console.log("Cell highlighted successfully:", cellKey);
-    
   } catch (error) {
     console.error("Error highlighting cell:", error);
   }
@@ -377,19 +374,16 @@ function clearCellHighlight() {
   
   try {
     const s = spreadsheet.value;
-    console.log('Clearing cell highlight - resetting to A1');
     
     // 直接重置到A1单元格
     if (s && s.sheet && s.sheet.selector && typeof s.sheet.selector.set === 'function') {
       s.sheet.selector.set(0, 0, 0, 0); // 重置到A1 (0,0)
-      console.log('Selector reset to A1');
     }
     
     // 设置行列索引为A1
     if (s && s.sheet) {
       s.sheet.ri = 0;
       s.sheet.ci = 0;
-      console.log('Sheet indices reset to A1');
     }
     
     // 清除选中位置
@@ -400,8 +394,6 @@ function clearCellHighlight() {
     if (s.reRender) {
       s.reRender();
     }
-    
-    console.log('Cell highlight cleared - reset to A1');
     
   } catch (error) {
     console.error("Error clearing cell highlight:", error);
@@ -420,14 +412,37 @@ async function handleFileChange(file: any) {
   try {
     const workbook = await processExcelFile(file.raw);
     if (workbook) {
+      // 保存工作簿引用
+      currentWorkbook.value = workbook;
+      
+      // 更新可用的工作表列表
+      availableSheets.value = workbook.SheetNames || [];
+      
+      // 设置当前工作表为第一个
+      if (availableSheets.value.length > 0) {
+        currentSheetName.value = availableSheets.value[0];
+      }
+      
       // 将Excel数据加载到x-data-spreadsheet中
-      await loadExcelDataToSpreadsheet(workbook);
+      await loadExcelDataToSpreadsheet(workbook, currentSheetName.value);
       emit("fileChange", workbook);
 
-      ElMessage.success("Excel文件加载成功，图表将自动生成");
+      ElMessage.success(`Excel文件加载成功，共有 ${availableSheets.value.length} 个工作表`);
     }
   } catch (error) {
     ElMessage.error("文件处理失败，请检查文件格式");
+  }
+}
+
+// 处理工作表切换
+async function handleSheetChange(sheetName: string) {
+  if (currentWorkbook.value && sheetName) {
+    try {
+      await loadExcelDataToSpreadsheet(currentWorkbook.value, sheetName);
+      ElMessage.success(`已切换到工作表: ${sheetName}`);
+    } catch (error) {
+      ElMessage.error("切换工作表失败");
+    }
   }
 }
 
@@ -437,17 +452,14 @@ const { analyzeHeaderLevel, generateGroupsByHeaderLevel } = useExcelProcessor();
 // 从表格获取当前数据并触发数据变化事件
 function getCurrentDataAndEmit() {
   if (!spreadsheet.value) {
-    console.log("No spreadsheet available");
     return null;
   }
 
   try {
     // 从x-data-spreadsheet获取数据
     const data = spreadsheet.value.getData();
-    console.log("Spreadsheet data:", data);
 
     if (!data || !data[0] || !data[0].rows) {
-      console.log("No valid data found in spreadsheet");
       return null;
     }
 
@@ -459,9 +471,6 @@ function getCurrentDataAndEmit() {
       col => col && col.trim() !== ""
     );
     const processedColumns = allProcessedColumns; // 保留所有列，包括序号列
-    console.log("All processed columns:", allProcessedColumns);
-    console.log("Processed columns (including first):", processedColumns);
-    console.log("Column mapping:", columnMapping);
 
     // 确定数据开始的行数（跳过表头行）
     let dataStartRow = 1;
@@ -486,8 +495,6 @@ function getCurrentDataAndEmit() {
         }
       }
     }
-
-    console.log("Data starts from row:", dataStartRow);
 
     // 获取数据行（排除序号列）
     Object.keys(sheet.rows).forEach(rowIndex => {
@@ -518,15 +525,12 @@ function getCurrentDataAndEmit() {
       }
     });
 
-    console.log("All extracted rows (including first column):", allRows);
-
     // 注意：统计行过滤现在在 useChartProcessor 中自动处理
     // 这里直接使用原始数据，过滤逻辑统一在图表生成时进行
 
     if (allRows.length > 0 && processedColumns.length > 0) {
       // 使用简化的表头级数判断
       const headerAnalysis = analyzeHeaderLevel(currentHeaderRows.value);
-      console.log("表头分析结果:", headerAnalysis);
 
       // 生成分组数据
       const columnGroups = headerAnalysis.isMultiLevel
@@ -540,14 +544,9 @@ function getCurrentDataAndEmit() {
         columnMapping: columnMapping, // 添加列映射
         headerRowCount: currentHeaderRows.value.length // 添加表头行数
       };
-      console.log("Emitting chart data with groups:", chartData);
       emit("dataChange", chartData);
       return chartData; // 返回数据用于精准更新
     } else {
-      console.log("No valid data to emit:", {
-        rowsLength: allRows.length,
-        columnsLength: processedColumns.length
-      });
       return null;
     }
   } catch (error) {
@@ -559,7 +558,6 @@ function getCurrentDataAndEmit() {
 // 精准单元格变更处理函数
 function getCurrentDataAndEmitWithCellChange(cellChangeInfo: CellChangeInfo) {
   if (!spreadsheet.value) {
-    console.log("No spreadsheet available");
     return;
   }
 
@@ -568,7 +566,6 @@ function getCurrentDataAndEmitWithCellChange(cellChangeInfo: CellChangeInfo) {
     const isStructuralChange = detectStructuralChange(cellChangeInfo);
     
     if (isStructuralChange) {
-      console.log("Detected structural change, forcing full chart regeneration");
       // 对于结构性变化，只进行完全重新生成
       getCurrentDataAndEmit();
       return;
@@ -583,7 +580,6 @@ function getCurrentDataAndEmitWithCellChange(cellChangeInfo: CellChangeInfo) {
       fullData: fullData
     });
 
-    console.log("Precise cell change emitted:", cellChangeInfo);
   } catch (error) {
     console.error("Error in precise cell change handling:", error);
     // 降级到全量更新
@@ -597,14 +593,12 @@ function detectStructuralChange(cellChangeInfo: CellChangeInfo): boolean {
   
   // 1. 对于表头行的修改，不视为结构性变化，让精准更新来处理标签更新
   if (rowIndex === 0) {
-    console.log("Header row changed - will be handled by label update, not structural change");
     return false; // 改为 false，让精准更新处理
   }
   
   // 2. 检查是否新增了列（列索引超出当前映射范围）
   const maxColumnIndex = Math.max(...Object.keys(columnMapping).map(k => parseInt(k)));
   if (columnIndex > maxColumnIndex) {
-    console.log("New column detected - column addition");
     // 自动添加新列到映射中
     columnMapping[columnIndex] = `Column${columnIndex}`;
     return true;
@@ -633,7 +627,6 @@ function detectStructuralChange(cellChangeInfo: CellChangeInfo): boolean {
       });
     
     if (!hasExistingData && !currentColumnName) {
-      console.log("New data column detected");
       return true;
     }
   }
@@ -656,7 +649,6 @@ function generateGroupsByLastLevel(columns: string[]): Record<string, string[]> 
     groups[lastLevel].push(column);
   });
   
-  console.log('按最后一级分组的列名:', groups);
   return groups;
 }
 
@@ -665,8 +657,6 @@ function scrollToCell(spreadsheetInstance: any, rowIndex: number, columnIndex: n
   if (!spreadsheetInstance || !spreadsheetInstance.sheet) return;
   
   try {
-    console.log("开始滚动到单元格:", { rowIndex, columnIndex });
-    
     const sheet = spreadsheetInstance.sheet;
     
     // 获取表格配置信息
@@ -674,29 +664,10 @@ function scrollToCell(spreadsheetInstance: any, rowIndex: number, columnIndex: n
     const colWidth = sheet.table?.colWidth || 100;
     const viewHeight = sheet.viewHeight || (window.innerHeight - 60);
     const viewWidth = sheet.viewWidth || (spreadsheetInstance.el?.clientWidth || 800);
-    
-    console.log("表格配置信息:", { rowHeight, colWidth, viewHeight, viewWidth });
+
     
     // 使用 x-data-spreadsheet 内置滚动条方法
     if (sheet.verticalScrollbar && sheet.horizontalScrollbar) {
-      // 先调试滚动条对象结构
-      console.log("滚动条对象调试:", {
-        verticalScrollbar: {
-          scroll: sheet.verticalScrollbar.scroll,
-          scrollTop: sheet.verticalScrollbar.scrollTop,
-          top: sheet.verticalScrollbar.top,
-          y: sheet.verticalScrollbar.y,
-          keys: Object.keys(sheet.verticalScrollbar)
-        },
-        horizontalScrollbar: {
-          scroll: sheet.horizontalScrollbar.scroll,
-          scrollLeft: sheet.horizontalScrollbar.scrollLeft,
-          left: sheet.horizontalScrollbar.left,
-          x: sheet.horizontalScrollbar.x,
-          keys: Object.keys(sheet.horizontalScrollbar)
-        }
-      });
-      
       // 计算目标位置
       const targetRowPosition = rowIndex * rowHeight;
       const targetColPosition = columnIndex * colWidth;
@@ -731,13 +702,6 @@ function scrollToCell(spreadsheetInstance: any, rowIndex: number, columnIndex: n
         currentHorizontalScroll = sheet.horizontalScrollbar.left;
       }
       
-      console.log("当前滚动位置调试:", { 
-        currentVerticalScroll,
-        currentHorizontalScroll,
-        targetRowPosition,
-        targetColPosition
-      });
-      
       // 计算需要的滚动距离
       // 纵向滚动：让目标行在可视区域中央
       const targetVerticalScroll = Math.max(0, targetRowPosition - viewHeight / 2);
@@ -747,35 +711,18 @@ function scrollToCell(spreadsheetInstance: any, rowIndex: number, columnIndex: n
       const targetHorizontalScroll = Math.max(0, targetColPosition - viewWidth / 2);
       const horizontalDistance = targetHorizontalScroll - currentHorizontalScroll;
       
-      console.log("计算滚动距离:", { 
-        verticalDistance, 
-        horizontalDistance,
-        targetVerticalScroll,
-        targetHorizontalScroll,
-        isVerticalNaN: isNaN(verticalDistance),
-        isHorizontalNaN: isNaN(horizontalDistance)
-      });
-      
       // 执行滚动 - 确保距离不是 NaN
       if (!isNaN(verticalDistance) && Math.abs(verticalDistance) > 1) {
-        console.log("执行纵向滚动:", verticalDistance);
         if (sheet.verticalScrollbar.moveFn) {
           sheet.verticalScrollbar.moveFn(verticalDistance);
         }
-      } else {
-        console.log("跳过纵向滚动:", { verticalDistance, isNaN: isNaN(verticalDistance) });
       }
       
       if (!isNaN(horizontalDistance) && Math.abs(horizontalDistance) > 1) {
-        console.log("执行横向滚动:", horizontalDistance);
         if (sheet.horizontalScrollbar.moveFn) {
           sheet.horizontalScrollbar.moveFn(horizontalDistance);
         }
-      } else {
-        console.log("跳过横向滚动:", { horizontalDistance, isNaN: isNaN(horizontalDistance) });
       }
-      
-      console.log("使用内置滚动条方法完成滚动");
     }
     
     // 强制重新渲染以确保显示更新
@@ -842,7 +789,6 @@ function loadSampleData() {
   
   // 使用简化的表头级数判断
   const headerAnalysis = analyzeHeaderLevel(currentHeaderRows.value);
-  console.log("示例数据表头分析:", headerAnalysis);
 
   // 将示例数据加载到x-data-spreadsheet中
   if (spreadsheet.value) {
@@ -895,13 +841,17 @@ function loadSampleData() {
 
 // 清空所有数据
 function clearAllData() {
-  // 重置列名映射
+  // 重置所有状态
   columnMapping = {};
-  
-  // 清空表头行数据
   currentHeaderRows.value = [];
+  availableSheets.value = [];
+  currentSheetName.value = '';
+  currentWorkbook.value = null;
+  selectedCellPosition.value = null;
+  highlightedCells.value.clear();
 
   if (spreadsheet.value) {
+    // 完全清空表格数据
     const emptySheet = {
       name: "Sheet1",
       freeze: "A1",
@@ -958,6 +908,24 @@ onMounted(() => {
   flex-shrink: 0;
   width: 100%;
   overflow: hidden;
+  align-items: center;
+}
+
+.sheet-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  :deep(.el-select) {
+    width: 180px;
+  }
+  
+  &::before {
+    content: "工作表:";
+    font-size: 14px;
+    color: #606266;
+    font-weight: 500;
+  }
 }
 
 .spreadsheet-container {

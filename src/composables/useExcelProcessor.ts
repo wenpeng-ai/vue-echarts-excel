@@ -100,7 +100,6 @@ export function useExcelProcessor(): ExcelProcessor {
       
       columns.push(finalColName)
     }
-    console.log('生成的列名:', columns)
     return columns
   }
 
@@ -122,7 +121,6 @@ export function useExcelProcessor(): ExcelProcessor {
       groups[lastLevel].push(column)
     })
     
-    console.log('按最后一级分组的列名:', groups)
     return groups
   }
 
@@ -173,7 +171,6 @@ export function useExcelProcessor(): ExcelProcessor {
     const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
     const dataRows = allRows.slice(headerRowCount)
     const columns = generateColumns(headerRows)
-    console.log('生成的列名:', columns)
     // 转换为对象数组
     const rows = dataRows.map(rowArr => {
       const rowObj: Record<string, any> = {}

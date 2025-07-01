@@ -92,7 +92,6 @@ export function useChartProcessor(): ChartProcessor {
       return newRow;
     });
     
-    console.log(`数据过滤完成 - 原始行数: ${rows.length}, 过滤后行数: ${finalRows.length}, 移除的序号列: ${columnToRemove || '无'}`);
     return { rows: finalRows, columns: filteredColumns };
   }
 
@@ -142,8 +141,6 @@ export function useChartProcessor(): ChartProcessor {
             // 确保是有限数字（排除 Infinity 和 NaN）
             if (isFinite(numValue)) {
               values.push(numValue);
-            } else {
-              console.log(`跳过无效数值 - 行 ${rowIndex + 1}, 列 ${deviceType}: "${cellValue}"`);
             }
           }
         }
@@ -151,7 +148,6 @@ export function useChartProcessor(): ChartProcessor {
 
       if (values.length > 0) {
         dataMap[deviceType] = values;
-        console.log(`${deviceType}: 提取到 ${values.length} 个有效数据点`);
       } else {
         console.warn(`警告: ${deviceType} 列没有有效的数值数据`);
       }
@@ -442,7 +438,6 @@ export function useChartProcessor(): ChartProcessor {
     const { rows: chartRows, columns: filteredColumns } = filterDataRows(rows, columns);
     if (chartRows.length === 0) return null;
     // 创建合并的图表配置
-    console.log(createCombinedChartOption(chartRows, filteredColumns, headerRowCount));
     return createCombinedChartOption(chartRows, filteredColumns, headerRowCount);
   }
 

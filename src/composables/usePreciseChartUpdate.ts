@@ -62,7 +62,6 @@ export function usePreciseChartUpdate() {
               newValue: numericValue,
               columnName
             });
-            console.log(`Found affected point: series ${seriesIndex}, data ${dataRowIndex}, column ${columnName}`);
           }
         }
       }
@@ -117,7 +116,6 @@ export function usePreciseChartUpdate() {
             silent: true
           });
           
-          console.log(`🎯 Updated point via graphic API: ${columnName} = ${newValue}`);
         }
       });
       
@@ -159,7 +157,6 @@ export function usePreciseChartUpdate() {
           };
           
           hasChanges = true;
-          console.log(`📝 Memory update: ${columnName}[${dataIndex}] = ${newValue}`);
         }
       });
       
@@ -191,41 +188,28 @@ export function usePreciseChartUpdate() {
     oldColumnName?: string
   ): boolean {
     if (!chartInstance || !preciseUpdateData.cellChange) {
-      console.log('🚫 No chart instance or cell change data');
       return false;
     }
 
     const { cellChange } = preciseUpdateData;
-    console.log('🔍 Processing cell change:', cellChange);
-    console.log('🔍 Old column name from parameter:', oldColumnName);
-    console.log('🔍 Old column name from cellChange:', cellChange.oldColumnName);
     
     // 检查是否为表头行的更新（列名修改）
     if (cellChange.rowIndex === 0) {
       const actualOldColumnName = oldColumnName || cellChange.oldColumnName;
-      console.log('🏷️ Header row detected, actualOldColumnName:', actualOldColumnName);
       
       if (actualOldColumnName && actualOldColumnName !== cellChange.newValue) {
-        console.log(`🏷️ Updating series label from "${actualOldColumnName}" to "${cellChange.newValue}"`);
         const labelUpdateSuccess = updateSeriesLabels(chartInstance, actualOldColumnName, cellChange.newValue);
         if (labelUpdateSuccess) {
-          console.log('✅ Series label update successful');
           return true;
-        } else {
-          console.log('❌ Series label update failed');
         }
-      } else {
-        console.log('🚫 No old column name or same value, skipping label update');
       }
       // 如果标签更新失败或没有旧列名，降级到全量更新
-      console.log('🔄 Falling back to full update for header change');
       return false;
     }
     
     // 检查是否为数值列的更新
     const columnName = cellChange.columnName;
     if (columnName === '序号' || columnName.includes('序号')) {
-      console.log('序号列更新，跳过图表更新');
       return true; // 序号列更新不影响图表
     }
 
@@ -233,27 +217,21 @@ export function usePreciseChartUpdate() {
     const affectedPoints = findAffectedDataPoints(cellChange, chartOptions, columnMapping);
     
     if (affectedPoints.length === 0) {
-      console.log('No affected data points found, skipping precise update');
       return false; // 降级到全量更新
     }
-
-    console.log(`🔧 Attempting precise update for ${affectedPoints.length} points`);
     
     // 策略1: 尝试内存数据更新（最快）
     const memorySuccess = updateDataInMemory(chartInstance, affectedPoints, cellChange);
     if (memorySuccess) {
-      console.log('✅ Precise update successful via memory strategy');
       return true;
     }
     
     // 策略2: 尝试图形API更新
     const graphicSuccess = updateWithGraphicAPI(chartInstance, affectedPoints, cellChange);
     if (graphicSuccess) {
-      console.log('✅ Precise update successful via graphic API');
       return true;
     }
-    
-    console.log('❌ All precise update strategies failed, will fallback to full update');
+
     return false;
   }
 
@@ -266,47 +244,37 @@ export function usePreciseChartUpdate() {
     newColumnName: string
   ): boolean {
     try {
-      console.log(`🎨 Starting series label update: "${oldColumnName}" -> "${newColumnName}"`);
       const currentOption = chartInstance.getOption() as any;
       let hasChanges = false;
-
-      console.log('🔍 Current chart series:', currentOption.series?.map((s: any) => ({ name: s.name, type: s.type })));
 
       // 更新系列名称
       currentOption.series.forEach((series: any, index: number) => {
         if (series.type === 'scatter' && series.name) {
           const seriesColumnName = series.name.replace('散点', '').trim();
-          console.log(`🔍 Checking series ${index}: "${series.name}" -> column name: "${seriesColumnName}"`);
           
           if (seriesColumnName === oldColumnName) {
             const oldSeriesName = series.name;
             series.name = `${newColumnName}散点`;
             hasChanges = true;
-            console.log(`✅ Updated series ${index} name: "${oldSeriesName}" -> "${series.name}"`);
           }
         }
       });
 
       // 更新图例
       if (currentOption.legend) {
-        console.log('🔍 Updating legend data...');
         // 处理单个图例对象
         if (!Array.isArray(currentOption.legend)) {
           const legend = currentOption.legend;
           if (legend.data && Array.isArray(legend.data)) {
-            console.log('🔍 Legend data before update:', legend.data);
             legend.data.forEach((item: any, index: number) => {
               if (typeof item === 'string' && item === `${oldColumnName}散点`) {
                 legend.data[index] = `${newColumnName}散点`;
                 hasChanges = true;
-                console.log(`✅ Updated legend item: ${oldColumnName}散点 -> ${newColumnName}散点`);
               } else if (typeof item === 'object' && item.name === `${oldColumnName}散点`) {
                 item.name = `${newColumnName}散点`;
                 hasChanges = true;
-                console.log(`✅ Updated legend object: ${oldColumnName}散点 -> ${newColumnName}散点`);
               }
             });
-            console.log('🔍 Legend data after update:', legend.data);
           }
         } else {
           // 处理图例数组
@@ -316,11 +284,9 @@ export function usePreciseChartUpdate() {
                 if (typeof item === 'string' && item === `${oldColumnName}散点`) {
                   legend.data[index] = `${newColumnName}散点`;
                   hasChanges = true;
-                  console.log(`✅ Updated legend item: ${oldColumnName}散点 -> ${newColumnName}散点`);
                 } else if (typeof item === 'object' && item.name === `${oldColumnName}散点`) {
                   item.name = `${newColumnName}散点`;
                   hasChanges = true;
-                  console.log(`✅ Updated legend object: ${oldColumnName}散点 -> ${newColumnName}散点`);
                 }
               });
             }
@@ -328,19 +294,13 @@ export function usePreciseChartUpdate() {
         }
       }
 
-      console.log(`🎨 Label update summary: hasChanges = ${hasChanges}`);
-
       if (hasChanges) {
-        console.log('🎨 Applying label changes to chart...');
         chartInstance.setOption(currentOption, {
           notMerge: true,
           silent: true
         });
-        console.log('✅ Label changes applied successfully');
         return true;
       }
-
-      console.log('⚠️ No changes detected for label update');
       return false;
     } catch (error) {
       console.error('💥 Label update failed:', error);
@@ -357,7 +317,6 @@ export function usePreciseChartUpdate() {
   ): boolean {
     // 如果是表头行（行索引为0），说明是列名修改
     if (cellChange.rowIndex === 0) {
-      console.log('Header row changed, will try label update instead of full regeneration');
       return true; // 改为true，因为我们现在可以处理标签更新
     }
 
@@ -366,7 +325,6 @@ export function usePreciseChartUpdate() {
     if (isNaN(numericValue) || !isFinite(numericValue)) {
       // 如果不是数值且不是表头，可能是文本修改，需要完全重新生成
       if (cellChange.rowIndex !== 0) {
-        console.log('Non-numeric value changed, requiring full chart regeneration');
         return false;
       }
     }
@@ -386,10 +344,6 @@ export function usePreciseChartUpdate() {
       series.name && 
       (series.name.includes(cellChange.columnName) || series.name.replace('散点', '').trim() === cellChange.columnName)
     );
-
-    if (!hasMatchingScatterSeries && cellChange.rowIndex !== 0) {
-      console.log('No matching scatter series found, requiring full chart regeneration');
-    }
 
     return hasMatchingScatterSeries || cellChange.rowIndex === 0;
   }
